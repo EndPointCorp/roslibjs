@@ -16,17 +16,17 @@ var worker = work(require('./cbor_worker.js'))
  *   * data - the uncompressed data
  */
 function decodeCbor(data, callback) {
-  var debased = decodeBase64(data);
+  //var debased = decodeBase64(data);
   var key = decodeCallbackIndex++;
   decodeCallbacks[key] = callback;
   let request = [
     key,
-    debased
+    data
   ];
-  worker.postMessage(request, [debased]);
+  worker.postMessage(request, [data]);
 }
 
-worker.addEventListener('message', function(ev) {
+worker.addEventListener('message', function handleDecodedCbor(ev) {
   var response = ev.data;
   var key = response[0];
   var data = response[1];

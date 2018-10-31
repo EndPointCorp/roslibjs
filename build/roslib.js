@@ -3655,7 +3655,8 @@ module.exports = require('object-assign')({
  * SOFTWARE.
  */
 
-(function(global, undefined) { "use strict";
+'use strict';
+
 var POW_2_24 = 5.960464477539063e-8,
     POW_2_32 = 4294967296,
     POW_2_53 = 9007199254740992;
@@ -3698,16 +3699,18 @@ function encode(value) {
   function prepareWrite(length) {
     var newByteLength = data.byteLength;
     var requiredLength = offset + length;
-    while (newByteLength < requiredLength)
+    while (newByteLength < requiredLength) {
       newByteLength <<= 1;
+    }
     if (newByteLength !== data.byteLength) {
       var oldDataView = dataView;
       data = new ArrayBuffer(newByteLength);
       dataView = new DataView(data);
       byteView = new Uint8Array(data);
       var uint32count = (offset + 3) >> 2;
-      for (var i = 0; i < uint32count; ++i)
+      for (var i = 0; i < uint32count; ++i) {
         dataView.setUint32(i << 2, oldDataView.getUint32(i << 2));
+      }
     }
 
     lastLength = length;
@@ -3762,27 +3765,33 @@ function encode(value) {
   function encodeItem(value) {
     var i;
 
-    if (value === false)
+    if (value === false) {
       return writeUint8(0xf4);
-    if (value === true)
+    }
+    if (value === true) {
       return writeUint8(0xf5);
-    if (value === null)
+    }
+    if (value === null) {
       return writeUint8(0xf6);
-    if (value === undefined)
+    }
+    if (value === undefined) {
       return writeUint8(0xf7);
+    }
 
     switch (typeof value) {
-      case "number":
+      case 'number':
         if (Math.floor(value) === value) {
-          if (0 <= value && value <= POW_2_53)
+          if (0 <= value && value <= POW_2_53) {
             return writeTypeAndLength(0, value);
-          if (-POW_2_53 <= value && value < 0)
+          }
+          if (-POW_2_53 <= value && value < 0) {
             return writeTypeAndLength(1, -(value + 1));
+          }
         }
         writeUint8(0xfb);
         return writeFloat64(value);
 
-      case "string":
+      case 'string':
         var utf8data = [];
         for (i = 0; i < value.length; ++i) {
           var charCode = value.charCodeAt(i);
@@ -3815,8 +3824,9 @@ function encode(value) {
         if (Array.isArray(value)) {
           length = value.length;
           writeTypeAndLength(4, length);
-          for (i = 0; i < length; ++i)
+          for (i = 0; i < length; ++i) {
             encodeItem(value[i]);
+          }
         } else if (value instanceof Uint8Array) {
           writeTypeAndLength(2, value.length);
           writeUint8Array(value);
@@ -3843,19 +3853,22 @@ function encode(value) {
 
   encodeItem(value);
 
-  if ("slice" in data)
+  if ('slice' in data) {
     return data.slice(0, offset);
+  }
 
   var ret = new ArrayBuffer(offset);
   var retView = new DataView(ret);
-  for (var i = 0; i < offset; ++i)
+  for (var i = 0; i < offset; ++i) {
     retView.setUint8(i, dataView.getUint8(i));
+  }
   return ret;
 }
 
 function defaultTagger(data, tag) {
-  if (tag in taggedArrayTypes)
+  if (tag in taggedArrayTypes) {
     return new taggedArrayTypes[tag](data);
+  }
   return data;
 }
 
@@ -3864,10 +3877,12 @@ function decode(data, tagger, simpleValue) {
   var byteView = new Uint8Array(data);
   var offset = 0;
 
-  if (typeof tagger !== "function")
+  if (typeof tagger !== 'function') {
     tagger = defaultTagger;
-  if (typeof simpleValue !== "function")
+  }
+  if (typeof simpleValue !== 'function') {
     simpleValue = function() { return undefined; };
+  }
 
   function commitRead(length, value) {
     offset += length;
@@ -3885,12 +3900,15 @@ function decode(data, tagger, simpleValue) {
     var exponent = value & 0x7c00;
     var fraction = value & 0x03ff;
 
-    if (exponent === 0x7c00)
+    if (exponent === 0x7c00) {
       exponent = 0xff << 10;
-    else if (exponent !== 0)
+    }
+    else if (exponent !== 0) {
       exponent += (127 - 15) << 10;
-    else if (fraction !== 0)
+    }
+    else if (fraction !== 0) {
       return (sign ? -1 : 1) * fraction * POW_2_24;
+    }
 
     tempDataView.setUint32(0, sign << 16 | exponent << 13 | fraction << 13);
     return tempDataView.getFloat32(0);
@@ -3914,33 +3932,42 @@ function decode(data, tagger, simpleValue) {
     return readUint32() * POW_2_32 + readUint32();
   }
   function readBreak() {
-    if (byteView[offset] !== 0xff)
+    if (byteView[offset] !== 0xff) {
       return false;
+    }
     offset += 1;
     return true;
   }
   function readLength(additionalInformation) {
-    if (additionalInformation < 24)
+    if (additionalInformation < 24) {
       return additionalInformation;
-    if (additionalInformation === 24)
+    }
+    if (additionalInformation === 24) {
       return readUint8();
-    if (additionalInformation === 25)
+    }
+    if (additionalInformation === 25) {
       return readUint16();
-    if (additionalInformation === 26)
+    }
+    if (additionalInformation === 26) {
       return readUint32();
-    if (additionalInformation === 27)
+    }
+    if (additionalInformation === 27) {
       return readUint64();
-    if (additionalInformation === 31)
+    }
+    if (additionalInformation === 31) {
       return -1;
-    throw "Invalid length encoding";
+    }
+    throw 'Invalid length encoding';
   }
   function readIndefiniteStringLength(majorType) {
     var initialByte = readUint8();
-    if (initialByte === 0xff)
+    if (initialByte === 0xff) {
       return -1;
+    }
     var length = readLength(initialByte & 0x1f);
-    if (length < 0 || (initialByte >> 5) !== majorType)
-      throw "Invalid indefinite length element";
+    if (length < 0 || (initialByte >> 5) !== majorType) {
+      throw 'Invalid indefinite length element';
+    }
     return length;
   }
 
@@ -3995,8 +4022,9 @@ function decode(data, tagger, simpleValue) {
     }
 
     length = readLength(additionalInformation);
-    if (length < 0 && (majorType < 2 || 6 < majorType))
-      throw "Invalid length";
+    if (length < 0 && (majorType < 2 || 6 < majorType)) {
+      throw 'Invalid length';
+    }
 
     switch (majorType) {
       case 0:
@@ -4023,21 +4051,25 @@ function decode(data, tagger, simpleValue) {
       case 3:
         var utf16data = [];
         if (length < 0) {
-          while ((length = readIndefiniteStringLength(majorType)) >= 0)
+          while ((length = readIndefiniteStringLength(majorType)) >= 0) {
             appendUtf16Data(utf16data, length);
-        } else
+          }
+        } else {
           appendUtf16Data(utf16data, length);
+        }
         return String.fromCharCode.apply(null, utf16data);
       case 4:
         var retArray;
         if (length < 0) {
           retArray = [];
-          while (!readBreak())
+          while (!readBreak()) {
             retArray.push(decodeItem());
+          }
         } else {
           retArray = new Array(length);
-          for (i = 0; i < length; ++i)
+          for (i = 0; i < length; ++i) {
             retArray[i] = decodeItem();
+          }
         }
         return retArray;
       case 5:
@@ -4066,21 +4098,15 @@ function decode(data, tagger, simpleValue) {
   }
 
   var ret = decodeItem();
-  if (offset !== data.byteLength)
-    throw "Remaining bytes";
+  if (offset !== data.byteLength) {
+    throw 'Remaining bytes';
+  }
   return ret;
 }
 
 var obj = { encode: encode, decode: decode };
 
-if (typeof define === "function" && define.amd)
-  define("cbor/cbor", obj);
-else if (typeof module !== "undefined" && module.exports)
-  module.exports = obj;
-else if (!global.CBOR)
-  global.CBOR = obj;
-
-})(this);
+module.exports = obj;
 
 },{}],40:[function(require,module,exports){
 module.exports = window.WebSocket;

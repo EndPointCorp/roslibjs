@@ -10,8 +10,7 @@
     "canvas": "./src/util/shim/canvas.js",
     "ws": "./src/util/shim/WebSocket.js",
     "xmldom": "./src/util/shim/xmldom.js",
-    "./src/util/decompressPng.js": "./src/util/shim/decompressPng.js",
-    "./src/util/decodeBase64.js": "./src/util/shim/decodeBase64.js"
+    "./src/util/decompressPng.js": "./src/util/shim/decompressPng.js"
   },
   "devDependencies": {
     "grunt": "^1.0.1",

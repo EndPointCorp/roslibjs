@@ -8,12 +8,33 @@
  */
 'use strict';
 
-var decompressPng = require('../util/decompressPng');
+//var decompressPng = require('../util/decompressPng');
 var CBOR = require('../util/cbor');
-var WebSocket = require('ws');
+//var WebSocket = require('ws');
 var BSON = null;
 if(typeof bson !== 'undefined'){
     BSON = bson().BSON;
+}
+var assign = require('object-assign');
+var Message = require('../core/Message');
+
+function findBuffers(o) {
+  var buffers = [];
+
+  for (var p in o) {
+    if (!o.hasOwnProperty(p)) {
+      continue;
+    }
+    var val = o[p];
+
+    if (ArrayBuffer.isView(val)) {
+      buffers.push(val.buffer);
+    } else if (typeof val === 'object' && !(val instanceof String) && !(val instanceof Array)) {
+      buffers.concat(findBuffers(val));
+    }
+  }
+
+  return buffers;
 }
 
 /**
@@ -25,27 +46,27 @@ if(typeof bson !== 'undefined'){
  * @private
  */
 function SocketAdapter(client) {
-  function handleMessage(message) {
+  function handleMessage(message, transfers) {
     if (message.op === 'publish') {
-      client.emit(message.topic, message.msg);
+      client.emit(message.topic, message.msg, transfers);
     } else if (message.op === 'service_response') {
-      client.emit(message.id, message);
+      client.emit(message.id, message, []);
     } else if (message.op === 'call_service') {
-      client.emit(message.service, message);
+      client.emit(message.service, message, []);
     } else if(message.op === 'status'){
       if(message.id){
-        client.emit('status:'+message.id, message);
+        client.emit('status:'+message.id, message, []);
       } else {
-        client.emit('status', message);
+        client.emit('status', message, []);
       }
     }
   }
 
-  function handleCompression(message, callback) {
+  function handlePng(message, callback) {
     if (message.op === 'png') {
-      decompressPng(message.data, callback);
+      //decompressPng(message.data, callback);
     } else {
-      callback(message);
+      handleMessage(message, []);
     }
   }
 
@@ -70,8 +91,7 @@ function SocketAdapter(client) {
      * @memberof SocketAdapter
      */
     onopen: function onOpen(event) {
-      client.isConnected = true;
-      client.emit('connection', event);
+      client.emit('connection', null, []);
     },
 
     /**
@@ -81,8 +101,7 @@ function SocketAdapter(client) {
      * @memberof SocketAdapter
      */
     onclose: function onClose(event) {
-      client.isConnected = false;
-      client.emit('close', event);
+      client.emit('close', null, []);
     },
 
     /**
@@ -92,7 +111,7 @@ function SocketAdapter(client) {
      * @memberof SocketAdapter
      */
     onerror: function onError(event) {
-      client.emit('error', event);
+      client.emit('error', null, []);
     },
 
     /**
@@ -110,13 +129,45 @@ function SocketAdapter(client) {
         });
       */
       if (data.data instanceof ArrayBuffer) {
-        handleMessage(CBOR.decode(data.data));
+        var decoded = CBOR.decode(data.data);
+        var transfers = findBuffers(decoded);
+        handleMessage(decoded, transfers);
       } else {
         var message = JSON.parse(typeof data === 'string' ? data : data.data);
-        handleCompression(message, handleMessage);
+        handlePng(message);
       }
     }
   };
 }
 
-module.exports = SocketAdapter;
+module.exports = function(self) {
+  var adapter = null;
+  var client = {
+    emit: function(op, arg, transferList) {
+      self.postMessage({
+        op: op,
+        arg: arg
+      }, transferList);
+    }
+  };
+  self.addEventListener('message', function(ev) {
+    var data = ev.data;
+    if ('url' in data) {
+      var url = data.url;
+      if (url === null) {
+        if (adapter !== null) {
+          adapter.close();
+        }
+        adapter = null;
+      } else {
+        var sock = new WebSocket(url);
+        sock.binaryType = 'arraybuffer';
+        adapter = assign(sock, SocketAdapter(client));
+      }
+    }
+    if ('msg' in data) {
+      var msg = data.msg;
+      adapter.send(msg);
+    }
+  });
+};

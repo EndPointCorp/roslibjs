@@ -256,7 +256,7 @@ function decode(data, tagger, simpleValue) {
     return value;
   }
   function readArrayBuffer(length) {
-    return commitRead(length, byteView.slice(offset, length));
+    return commitRead(length, byteView.subarray(offset, offset + length));
   }
   function readFloat16() {
     var tempArrayBuffer = new ArrayBuffer(4);

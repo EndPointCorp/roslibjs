@@ -3,8 +3,10 @@
  * @author Brandon Alexander - baalexander@gmail.com
  */
 
-var WebSocket = require('ws');
-var socketAdapter = require('./SocketAdapter.js');
+var work = require('webworkify');
+//var WebSocket = require('ws');
+//var socketAdapter = require('./SocketAdapter.js');
+//var socketAdapter = work(require('./SocketAdapter.js'));
 
 var Service = require('./Service');
 var ServiceRequest = require('./ServiceRequest');
@@ -70,11 +72,28 @@ Ros.prototype.connect = function(url) {
   } else if (this.transportLibrary.constructor.name === 'RTCPeerConnection') {
     this.socket = assign(this.transportLibrary.createDataChannel(url, this.transportOptions), socketAdapter(this));
   }else {
+    this.socket = work(require('./SocketAdapter.js'));
+    this.socket.postMessage({url: url});
+
+    var self = this;
+    this.socket.addEventListener('message', function(ev) {
+      var data = ev.data;
+      var op = data.op;
+      var arg = data.arg;
+      self.emit(op, arg);
+    });
+    /*
     var sock = new WebSocket(url);
     sock.binaryType = 'arraybuffer';
     this.socket = assign(sock, socketAdapter(this));
+    */
   }
-
+  this.on('connection', function(ev) {
+    this.isConnected = true;
+  });
+  this.on('close', function(ev) {
+    this.isConnected = false;
+  });
 };
 
 /**
@@ -82,7 +101,7 @@ Ros.prototype.connect = function(url) {
  */
 Ros.prototype.close = function() {
   if (this.socket) {
-    this.socket.close();
+    this.socket.postMessage({url: null});
   }
 };
 
@@ -121,11 +140,16 @@ Ros.prototype.callOnConnection = function(message) {
   var that = this;
   var messageJson = JSON.stringify(message);
   var emitter = null;
+  /*
   if (this.transportLibrary === 'socket.io') {
     emitter = function(msg){that.socket.emit('operation', msg);};
   } else {
     emitter = function(msg){that.socket.send(msg);};
   }
+  */
+  emitter = function(msg) {
+    that.socket.postMessage({msg: msg});
+  };
 
   if (!this.isConnected) {
     that.once('connection', function() {
